@@ -1,6 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 1.3.3
+
+- Add 'airflow_current_failed_tasks' metric
 ## 1.3.2
 
 - Remove 'hostname' from airflow_task_status by @cansjt see https://github.com/epoch8/airflow-exporter/issues/77 for details

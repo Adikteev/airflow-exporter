@@ -87,6 +87,15 @@ Labels:
 Value: duration in seconds of the longest DAG Run for given DAG. This metric 
 is not available for DAGs that have already completed.
 
+### `airflow_current_failed_tasks`
+
+Labels:
+
+* `dag_id`
+* `task_id`
+* `execution_date`
+
+Value: 1 if the current tasks in the failed status.
 ## License
 
 Distributed under the BSD license. See [LICENSE](LICENSE) for more

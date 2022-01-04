@@ -1,5 +1,6 @@
 from sqlalchemy import func
 from sqlalchemy import text
+from sqlalchemy import or_
 
 from flask import Response
 from flask_admin import BaseView, expose
@@ -47,6 +48,30 @@ def get_task_state_info():
         task_status_query.c.state, task_status_query.c.value, DagModel.owners
     ).join(DagModel, DagModel.dag_id == task_status_query.c.dag_id).order_by(task_status_query.c.dag_id).all()
 
+def get_current_failed_tasks_status():
+    '''get current failed tasks status
+    :return current_failed_tasks_status
+    '''
+    last_tasks_query = Session.query(
+        TaskInstance.dag_id, TaskInstance.task_id,
+        func.max(TaskInstance.execution_date).label("max_execution_dt"),
+    ).filter(
+        or_(
+            TaskInstance.state == State.FAILED,
+            TaskInstance.state == State.SUCCESS,
+        )
+    ).group_by(TaskInstance.dag_id, TaskInstance.task_id).subquery()
+
+    return Session.query(
+        TaskInstance.dag_id, TaskInstance.task_id,
+        TaskInstance.state, TaskInstance.execution_date
+    ).filter(TaskInstance.state == State.FAILED).join(
+        last_tasks_query, (last_tasks_query.c.dag_id == TaskInstance.dag_id)
+        & (last_tasks_query.c.task_id == TaskInstance.task_id)
+        & (last_tasks_query.c.max_execution_dt == TaskInstance.execution_date)
+    ).join(DagModel, DagModel.dag_id == last_tasks_query.c.dag_id).filter(
+        DagModel.is_active == True, DagModel.is_paused == False,
+    ).all()
 
 def get_dag_duration_info():
     '''get duration of currently running DagRuns
@@ -145,6 +170,22 @@ class MetricsCollector(object):
             else:
                 dag_duration.add_metric([dag.dag_id] + v, dag.duration.seconds)
             yield dag_duration
+
+        # Current failed tasks status metrics
+        current_failed_tasks_status = get_current_failed_tasks_status()
+        for dag_id, tasks in itertools.groupby(current_failed_tasks_status, lambda x: x.dag_id):
+            k, v = get_dag_labels(dag_id)
+
+            t_current_failure = GaugeMetricFamily(
+                "airflow_current_failed_tasks",
+                "Current failed tasks",
+                labels=['dag_id', 'task_id', 'execution_date'],
+            )
+
+            for task in tasks:
+                t_current_failure.add_metric([task.dag_id, task.task_id, task.execution_date.strftime('%Y-%m-%dT%H:%M:%S')], 1.0)
+
+            yield t_current_failure
 
 
 REGISTRY.register(MetricsCollector())
