@@ -55,17 +55,11 @@ def get_current_failed_tasks_status():
     last_tasks_query = Session.query(
         TaskInstance.dag_id, TaskInstance.task_id,
         func.max(TaskInstance.execution_date).label("max_execution_dt"),
-    ).filter(
-        or_(
-            TaskInstance.state == State.FAILED,
-            TaskInstance.state == State.SUCCESS,
-        )
     ).group_by(TaskInstance.dag_id, TaskInstance.task_id).subquery()
 
     return Session.query(
         TaskInstance.dag_id, TaskInstance.task_id,
-        TaskInstance.state, TaskInstance.execution_date
-    ).filter(TaskInstance.state == State.FAILED).join(
+        TaskInstance.state, TaskInstance.execution_date).join(
         last_tasks_query, (last_tasks_query.c.dag_id == TaskInstance.dag_id)
         & (last_tasks_query.c.task_id == TaskInstance.task_id)
         & (last_tasks_query.c.max_execution_dt == TaskInstance.execution_date)
@@ -183,7 +177,9 @@ class MetricsCollector(object):
             )
 
             for task in tasks:
-                t_current_failure.add_metric([task.dag_id, task.task_id, task.execution_date.strftime('%Y-%m-%dT%H:%M:%S')], 1.0)
+                t_current_failure.add_metric(
+                    [task.dag_id, task.task_id, task.execution_date.strftime('%Y-%m-%dT%H:%M:%S')],
+                    1.0 if task.state == State.FAILED else 0.0)
 
             yield t_current_failure
 
