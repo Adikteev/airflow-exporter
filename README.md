@@ -95,7 +95,7 @@ Labels:
 * `task_id`
 * `execution_date`
 
-Value: 1 if the current tasks in the failed status.
+Value: 1 if the current tasks in the failed status 0 otherwise.
 ## License
 
 Distributed under the BSD license. See [LICENSE](LICENSE) for more
